@@ -12,20 +12,68 @@
    </style>
 </head>
 <body>
+   <!-- 
+   how the HTML renders a map in the browser:
+   This div creates an empty HTML container for the map. The id="map" connects this element 
+   to the Mapbox GL JS configuration through the container property. Mapbox uses this element 
+   to render the interactive map inside the browser.
+   -->
    <div id='map'></div>
    <script>
+      // Authenticate requests to Mapbox using public token
       mapboxgl.accessToken = 'pk.eyJ1IjoianVudGFvemhvbmciLCJhIjoiY211enY0cW96MHl2bjM0b3Qwb2xrcjBkNiJ9.1W1VvYKySrEgNJqEg86Rlw';
+      
+      /*
+      how the HTML renders a map in the browser:
+      The browser first loads the HTML document, including the map container and the Mapbox GL JS library.
+      Then creates a new Mapbox map instance using the mapboxgl.Map() constructor.The container property 
+      links the Mapbox instance to the HTML element with id="map". Mapbox GL JS uses WebGL to render map 
+      tiles, geographic features, and map styles inside that HTML container. The center and zoom properties 
+      determine which geographic area is initially visible to the user.  
+      */
       const mymap = new mapboxgl.Map({
-             container: 'map',
-             style: 'mapbox://styles/mapbox/light-v11',
-             projection: 'globe', //Display the map as a globe since satellite-v9 defaults to Mercator
-             center: [-96, 37.8],
-             zoom:1
-          });
+            container: 'map',
+            style: 'mapbox://styles/mapbox/standard', // standard style
+            projection: 'globe', //Display the map as a globe 
+            center: [-122.319, 47.625], // centered at Seattle， around Capitol Hill
+            zoom:13 // set the zoom level to show streets and neighborhoods
+         });
 
-// code from the next step will go here!
-mymap.addControl(new mapboxgl.FullscreenControl());
-mymap.addControl(new mapboxgl.NavigationControl()); 
+      // Wait until the Standard map style has finished loading
+      // before changing its basemap configuration properties.
+      mymap.on('style.load', () => {
+
+         mymap.setConfigProperty('basemap', 'lightPreset', 'dusk'); // Change the lighting from day to dusk.
+         mymap.setConfigProperty('basemap', 'showPointOfInterestLabels', false); // Hide labels for restaurants, shops, and other POIs.
+
+         // Step 7: 3D objects
+         // Show 3D buildings, landmarks, and other 3D features.
+         // This helps users understand urban structures.
+         mymap.setConfigProperty('basemap', 'show3dObjects', true);
+
+         // Step 7: Transit labels
+         // Hide public transportation labels and icons.
+         // This helps users identify transit connections.
+         mymap.setConfigProperty('basemap', 'showTransitLabels', false);
+
+      });
+
+      /*
+      Part 3, Step 7 - Explanation and Justification
+
+      1. show3dObjects
+      I set show3dObjects to true to display 3D buildings, landmarks, and other 3D features on the map.
+      This property is especially useful for urban planning, city exploration, and viewing building distributions.
+      
+      2. showTransitLabels
+      I set showTransitLabels to false to hide public transportation labels and icons on the map.
+      This property is useful for exploring public transit accessibility, planning trips, and comparing
+      neighborhood transportation options. I hide this because it reduces visual clutter and makes streets
+      and other map features easier to identify.
+      */
+
+mymap.addControl(new mapboxgl.FullscreenControl()); // expand the map to fill entire screen.
+mymap.addControl(new mapboxgl.NavigationControl()); // zooming and rotating.
 </script>
 </body>
 </html>
