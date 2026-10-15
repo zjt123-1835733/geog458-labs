@@ -9,6 +9,47 @@
     <style>
         body { margin: 0; padding: 0; }
         #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        /* Layout of the legend panel. */
+        #legend {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 110px;
+            background: #fff;
+            margin-right: 20px;
+            margin-bottom: 40px;
+            padding: 10px 20px 10px 10px;
+            border-radius: 3px;
+            text-align: center;
+        }
+
+        /* Each row for a magnitude value. */
+        .break {
+            position: relative;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* The circular symbol. */
+        .dot {
+            display: inline-block;
+            margin-top: 5px;
+            border-radius: 50%;
+            opacity: 0.6;
+        }
+
+        /* Label next to the symbol. */
+        .dot-label {
+            position: absolute;
+            top: 0;
+            right: 0;
+            font-style: italic;
+        }
+
+        /* Link color within the legend. */
+        #legend a {
+            color: black;
+        }
     </style>
 </head>
 <body>
@@ -74,7 +115,8 @@
                         8.5,  '#7f0000',
                         10.5, '#000000'
                     ],
-                    'circle-stroke-color': 'white'
+                    'circle-stroke-color': 'white',
+                    'circle-opacity': 0.6
                 }
             });
 
@@ -89,6 +131,31 @@
                     .addTo(mymap);
             });
         });
+
+        // Anchor the legend to the HTML element with id="legend".
+        const legend = document.getElementById('legend');
+        const grades = [2, 4.5, 8.5];
+        const radii = [4, 9, 17];
+        const colors = ['#fdd49e', '#d7301f', '#7f0000'];
+        const labels = ['<strong>Magnitude</strong>'];
+
+        for (let i = 0; i < grades.length; i++) {
+            const value = grades[i];
+            const diameter = 2 * radii[i];
+
+            labels.push(
+                '<p class="break"><i class="dot" style="background:' + colors[i] +
+                '; width:' + diameter + 'px; height:' + diameter +
+                'px;"></i> <span class="dot-label" style="top:' +
+                diameter / 2 + 'px;">' + value + '</span></p>'
+            );
+        }
+
+        const source =
+            '<p style="text-align:right; font-size:10pt;">Source: ' +
+            '<a href="https://earthquake.usgs.gov/earthquakes/">USGS</a></p>';
+
+        legend.innerHTML = labels.join('') + source;
     </script>
 </body>
 </html>
