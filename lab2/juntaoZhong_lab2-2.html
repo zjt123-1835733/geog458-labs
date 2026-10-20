@@ -1,0 +1,208 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>World Cities Population</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.js"></script>
+
+    <style>
+        body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+
+        /* Layout of the map title and legend. */
+        #title, #legend {
+            position: absolute;
+            left: 20px;
+            background: white;
+            padding: 12px 16px;
+            border-radius: 4px;
+            box-shadow: 0 2px 6px #0003;
+        }
+
+        #title { top: 20px; }
+        #title h2 { margin: 0 0 5px; font-size: 20px; }
+        #title p { margin: 0; font-size: 13px; }
+        #legend { bottom: 30px; font-size: 13px; }
+
+        .break {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 9px 0;
+        }
+
+        .dot {
+            display: inline-block;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+
+    <div id="title">
+        <h2>World Cities Population</h2>
+        <p>Highlighting the 10 most populous cities</p>
+    </div>
+
+    <div id="legend"></div>
+
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1IjoianVudGFvemhvbmciLCJhIjoiY211enY0cW96MHl2bjM0b3Qwb2xrcjBkNiJ9.1W1VvYKySrEgNJqEg86Rlw';
+
+        // Initialize a light basemap to improve population symbol visibility.
+        const mymap = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/light-v11',
+            center: [0, 20],
+            zoom: 1.5
+        });
+
+        mymap.addControl(new mapboxgl.NavigationControl());
+
+        /*
+        * Manual classification divides cities into four clear population groups,
+        * using breaks at 100K, 1M, and 5M to distinguish small, medium,
+        * large, and very large cities. 
+        * Circle sizes increase by class rather than scaling proportionally
+        * with population. I think this would be more straight-forward.
+        * Light-to-dark blue colors are commonly used in census track, they
+        * indicate increasing population as the color getting darker.
+        * Gold dots highlight the 10 most populous cities.
+        */
+        const grades = [0, 100000, 1000000, 5000000];
+        const radii = [3, 5, 7, 10];
+        const colors = ['#91c7e8', '#3182bd', '#08519c', '#08306b'];
+        const names = [
+            'Under 100,000',
+            '100,000 - 999,999',
+            '1M - 4,999,999',
+            '5M and above'
+        ];
+
+        mymap.on('load', async () => {
+
+            // Load the local city data.
+            // In order to automatically identify the 10 most populous cities,
+            // I looked up and learned about fetch(), async, and await.
+            // I used them to load the GeoJSON data before sorting cities by population.
+            const response = await fetch('data/world-cities.geojson');
+            const cities = await response.json();
+
+            // Select the 10 most populous cities from the dataset.
+            const top10 = [...cities.features]
+                .sort((a, b) => b.properties.population - a.properties.population)
+                .slice(0, 10);
+
+            // Add separate sources for all cities and the top 10 cities.
+            mymap.addSource('population', {
+                type: 'geojson',
+                data: cities
+            });
+
+            mymap.addSource('top10', {
+                type: 'geojson',
+                data: {
+                    type: 'FeatureCollection',
+                    features: top10
+                }
+            });
+
+            // Show all cities with graduated population symbols.
+            mymap.addLayer({
+                id: 'cities-layer',
+                type: 'circle',
+                source: 'population',
+                paint: {
+                    'circle-radius': [
+                        'step', ['get', 'population'],
+                        3,
+                        100000, 5,
+                        1000000, 7,
+                        5000000, 10
+                    ],
+                    'circle-color': [
+                        'step', ['get', 'population'],
+                        colors[0],
+                        100000, colors[1],
+                        1000000, colors[2],
+                        5000000, colors[3]
+                    ],
+                    'circle-opacity': 0.75,
+                    'circle-stroke-color': 'white',
+                    'circle-stroke-width': 0.5
+                }
+            });
+
+            // Highlight the top 10 cities in gold above the blue circles.
+            mymap.addLayer({
+                id: 'top10-layer',
+                type: 'circle',
+                source: 'top10',
+                paint: {
+                    'circle-radius': 13,
+                    'circle-color': '#ffbf00',
+                    'circle-opacity': 1,
+                    'circle-stroke-color': '#683f00',
+                    'circle-stroke-width': 2
+                }
+            });
+
+            // // Display the city name and population when clicked.
+            mymap.on('click', 'cities-layer', (event) => {
+                const feature = event.features[0];
+                const coordinates = feature.geometry.coordinates.slice(0, 2);
+
+                new mapboxgl.Popup()
+                    .setLngLat(coordinates)
+                    .setHTML(`City: ${feature.properties.accentcity}<p>Population: ${feature.properties.population}</p>`)
+                    .addTo(mymap);
+            });
+
+            // Looked up and learned how to change the cursor 
+            // when hovering over city circles.
+            ['cities-layer', 'top10-layer'].forEach(layer => {
+                mymap.on('mouseenter', layer, () => {
+                    mymap.getCanvas().style.cursor = 'pointer';
+                });
+                mymap.on('mouseleave', layer, () => {
+                    mymap.getCanvas().style.cursor = '';
+                });
+            });
+        });
+
+        // Create a matching legend for circle sizes and colors.
+        const legend = document.getElementById('legend');
+        const labels = ['<strong>City Population</strong>'];
+
+        for (let i = 0; i < grades.length; i++) {
+            const diameter = radii[i] * 2;
+
+            labels.push(
+                `<div class="break">
+                    <i class="dot" style="background:${colors[i]};
+                    width:${diameter}px;height:${diameter}px"></i>
+                    ${names[i]}
+                </div>`
+            );
+        }
+
+        // Gold circles identify the 10 most populous cities.
+        labels.push(
+            `<div class="break">
+                <i class="dot" style="background:#ffbf00;
+                border:2px solid #683f00;
+                width:26px;height:26px"></i>
+                Top 10 Most Populous Cities
+            </div>`
+        );
+
+        legend.innerHTML = labels.join('');
+    </script>
+</body>
+</html>

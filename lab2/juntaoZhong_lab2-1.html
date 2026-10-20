@@ -83,8 +83,6 @@
                 type: 'circle',
                 source: 'earthquakes',
                 paint: {
-                    // 'circle-radius': 4,
-                    // 'circle-radius': ['*', 2, ['get', 'mag']],
                     'circle-radius': [
                         'interpolate', ['linear'],
                         ['to-number', ['get', 'mag'], 0],
