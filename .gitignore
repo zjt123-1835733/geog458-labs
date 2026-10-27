@@ -1,0 +1,5 @@
+# Large DEM file - keep locally
+lab3/data/elevation_raw.tif
+
+# QGIS temporary files
+*.aux.xml

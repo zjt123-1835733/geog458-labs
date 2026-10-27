@@ -1,0 +1,218 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lab 3: Mount Rainier Elevation and Hiking Trails</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.15.0/dist/maplibre-gl.css">
+
+  <style>
+    body { margin: 0; font: 14px/1.5 Arial, sans-serif; color: #182e3a; }
+    #map { position: absolute; inset: 0; }
+
+    #panel { position: absolute; top: 12px; left: 12px; padding: 16px;
+      width: 260px; max-width: calc(100% - 100px); background: white;
+      max-height: calc(100% - 80px); overflow: auto; border-radius: 6px; }
+
+    h1 { margin: 0 0 8px; font-size: 19px; }
+    p { margin: 8px 0; }
+
+    /* Elevation color ramp matches the QGIS raster styling. */
+    .ramp { height: 14px; background: linear-gradient(to right,
+      #337c64, #9db779, #c9b47f, #897a6d, #f7f7f4); }
+
+    .values { display: flex; justify-content: space-between; }
+
+    /* Legend symbol for hiking trails. */
+    .trail-line { display: inline-block; width: 28px;
+      border-top: 3px solid #f0627d; margin-right: 6px;
+      vertical-align: middle; }
+
+    .maplibregl-popup-content { white-space: pre-line; }
+  </style>
+</head>
+
+<body>
+  <div id="map"></div>
+
+  <!-- Map information, controls, and legend. -->
+  <section id="panel">
+    <h1>Mount Rainier: Elevation and Hiking Trails</h1>
+
+    <p>Washington, USA | USGS 3DEP and OpenStreetMap</p>
+
+    <p>Explore how hiking trails are distributed across the
+      mountainous terrain of Mount Rainier.</p>
+
+    <p id="status">Loading map layers...</p>
+
+    <!-- Elevation layer control. -->
+    <div id="surface-control" hidden>
+      <label>
+        <input id="show-surface" type="checkbox" checked>
+        Show elevation
+      </label>
+    </div>
+
+    <!-- Hiking trail layer control. -->
+    <div id="trail-control" hidden>
+      <label>
+        <input id="show-trails" type="checkbox" checked>
+        Show hiking trails
+      </label>
+    </div>
+
+    <!-- Elevation and hiking trail legend. -->
+    <div id="legend" hidden>
+      <p><strong>Elevation (meters)</strong></p>
+      <div class="ramp"></div>
+      <div class="values">
+        <span>0</span><span>2200</span><span>4400</span>
+      </div>
+
+      <p><span class="trail-line"></span> Hiking paths (OSM)</p>
+      <p>Trail information is from OpenStreetMap.
+        Check current conditions before hiking.</p>
+    </div>
+  </section>
+
+  <script type="module">
+    import * as maplibregl from 'https://unpkg.com/maplibre-gl@6.15.0/dist/maplibre-gl.mjs';
+
+    // Step 1: Create the map centered on Mount Rainier.
+    const map = new maplibregl.Map({
+        container: 'map',
+        style: {
+            version: 8,
+            sources: {},
+            layers: [{ id: 'background', type: 'background',
+            paint: { 'background-color': '#edf1f0' } }]
+        },
+        center: [-121.760, 46.853],
+        zoom: 10,
+        minZoom: 9,
+        maxZoom: 13,
+        maxBounds: [[-121.98, 46.68], [-121.52, 47.02]]
+    });
+
+    map.addControl(new maplibregl.NavigationControl());
+    map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }));
+
+    // Report errors if local tile or GeoJSON files cannot load.
+    map.on('error', (event) => {
+        document.getElementById('status').textContent =
+            'Load error: check the file path and browser Console.';
+        console.error(event.error);
+    });
+
+    map.on('load', () => {
+
+        // Step 2: Add the independent Mapbox Light basemap tiles.
+        map.addSource('basemap-tiles', {
+            type: 'raster',
+            tiles: ['assets/mapbox-independent/{z}/{x}/{y}.png'],
+            tileSize: 256,
+            scheme: 'xyz',
+            minzoom: 9,
+            maxzoom: 13,
+            bounds: [-121.98, 46.68, -121.52, 47.02],
+            attribution: '© Mapbox © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        });
+
+        map.addLayer({
+            id: 'basemap',
+            type: 'raster',
+            source: 'basemap-tiles',
+            paint: { 'raster-opacity': 1, 'raster-fade-duration': 0 }
+        });
+
+        // Step 3: Add the USGS elevation raster tiles above the basemap.
+        map.addSource('elevation-tiles', {
+            type: 'raster',
+            tiles: ['assets/elevation/{z}/{x}/{y}.png'],
+            tileSize: 256,
+            scheme: 'xyz',
+            minzoom: 9,
+            maxzoom: 13,
+            bounds: [-121.98, 46.68, -121.52, 47.02],
+            attribution: 'Elevation: USGS 3DEP; map visualization by Juntao'
+        });
+
+        map.addLayer({
+            id: 'elevation-surface',
+            type: 'raster',
+            source: 'elevation-tiles',
+            paint: { 'raster-opacity': 0.65, 'raster-fade-duration': 0 }
+        });
+
+        // Allow the elevation layer to be turned on or off.
+        document.getElementById('surface-control').hidden = false;
+        document.getElementById('show-surface').addEventListener('change', (event) => {
+            map.setLayoutProperty('elevation-surface', 'visibility',
+            event.target.checked ? 'visible' : 'none');
+        });
+
+        // Step 4: Add hiking trail GeoJSON data.
+        map.addSource('trail-data', {
+            type: 'geojson',
+            data: 'data/trails_raw.geojson'
+        });
+
+        // Draw hiking trails as colored lines instead of circles.
+        map.addLayer({
+            id: 'hiking-trails',
+            type: 'line',
+            source: 'trail-data',
+            paint: {
+            'line-color': '#f0627d',
+            'line-width': 2.5,
+            'line-opacity': 0.9
+            }
+        });
+
+        // Show trail information when a line is clicked.
+        map.on('click', 'hiking-trails', (event) => {
+            const feature = event.features[0];
+            const trail = feature.properties;
+
+            const name = trail.name || 'Unnamed Trail';
+            const foot = trail.foot || 'Not specified';
+            const operator = trail.operator || 'Not specified';
+
+            new maplibregl.Popup()
+            .setLngLat(event.lngLat)
+            .setText([
+                name,
+                'Foot Access: ' + foot,
+                'Operator: ' + operator
+            ].join('\n'))
+            .addTo(map);
+        });
+
+        // Change the cursor when pointing at a hiking trail.
+        map.on('mouseenter', 'hiking-trails', () => {
+            map.getCanvas().style.cursor = 'pointer';
+        });
+
+        map.on('mouseleave', 'hiking-trails', () => {
+            map.getCanvas().style.cursor = '';
+        });
+
+        // Allow hiking trails to be turned on or off.
+        document.getElementById('trail-control').hidden = false;
+        document.getElementById('show-trails').addEventListener('change', (event) => {
+            map.setLayoutProperty('hiking-trails', 'visibility',
+            event.target.checked ? 'visible' : 'none');
+        });
+
+        // Show the legend after the map layers are added.
+        document.getElementById('legend').hidden = false;
+
+        document.getElementById('status').textContent =
+            'Click a hiking trail to view its name, foot access, and operator.';
+
+    });
+  </script>
+</body>
+</html>
