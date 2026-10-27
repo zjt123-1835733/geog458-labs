@@ -13,3 +13,5 @@ The numeric `pm25` field uses **µg/m³**, not AQI. `station_name`, `station_id`
 Reproduce by selecting Washington, the bounding box in the metadata, 2025-07-05, 24-HR BLK AVG, PM25 24-hour 2012, no exceptional events, nonnegative values and at least 75% observations. If multiple POCs remain, retain the lowest numeric POC per site. Preserve station identifiers as text.
 
 An interpolated map estimates values between monitors. Its apparent 250 m cell size does not establish 250 m measurement accuracy. This sample supports a classroom demonstration, not a health or regulatory conclusion.
+
+
