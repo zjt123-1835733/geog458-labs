@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lab 4 — Pittsburgh trees</title>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.js"></script>
+  <style>
+    body { margin: 0; padding: 0; }
+    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    mapboxgl.accessToken = 'pk.eyJ1IjoianVudGFvemhvbmciLCJhIjoiY211enY0cW96MHl2bjM0b3Qwb2xrcjBkNiJ9.1W1VvYKySrEgNJqEg86Rlw';
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/dark-v11',
+      projection: 'globe',
+      center: [-79.999732, 40.4374],
+      zoom: 11,
+      maxZoom: 15
+    });
+
+    map.addControl(new mapboxgl.FullscreenControl());
+    map.addControl(new mapboxgl.NavigationControl());
+
+    // This callback runs after the map style is ready. Keep its braces.
+    map.on('load', () => {
+        map.setFog({});
+        map.addSource('trees', {
+            type: 'geojson',
+            data: 'data/trees.geojson'
+        });
+        map.addLayer({
+            'id': "trees-heat",
+            'type': "heatmap",
+            'source': "trees",
+            'maxzoom': 15,
+            'paint': {
+                'heatmap-weight': {
+                'property': "dbh",
+                'type': "exponential",
+                'stops': [[1, 0], [62, 1]]
+                },
+                'heatmap-intensity': {
+                'stops': [[11, 1], [15, 3]]
+                },
+                'heatmap-color': [
+                "interpolate", ["linear"], ["heatmap-density"],
+                0, "rgba(236,222,239,0)",
+                0.2, "rgb(208,209,230)",
+                0.4, "rgb(166,189,219)",
+                0.6, "rgb(103,169,207)",
+                0.8, "rgb(28,144,153)"
+                ],
+                'heatmap-radius': {
+                'stops': [[11, 15], [15, 20]]
+                },
+                'heatmap-opacity': {
+                'default': 1,
+                'stops': [[14, 1], [15, 0]]
+                }
+            }
+        });
+      // [1.5] REPLACE THIS LINE WITH THE TREE CIRCLE BLOCK.
+      // [1.6] REPLACE THIS LINE WITH THE TREE POPUP BLOCK.
+    });
+  </script>
+</body>
+</html>
