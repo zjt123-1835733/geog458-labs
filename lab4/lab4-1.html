@@ -57,14 +57,15 @@
           },
           // 1.7:
           // Baseline: Purple -> Blue -> Teal.
-          // Final: Purple -> Blue -> Teal.
+          // Final: light-to-dark forest green color ramp.
           'heatmap-color': [
             'interpolate', ['linear'], ['heatmap-density'],
-            0, "rgba(236,222,239,0)",
-            0.2, "rgb(208,209,230)",
-            0.4, "rgb(166,189,219)",
-            0.6, "rgb(103,169,207)",
-            0.8, "rgb(28,144,153)"
+            0, 'rgba(229,245,224,0)',
+            0.2, 'rgb(229,245,224)',
+            0.4, 'rgb(161,217,155)',
+            0.6, 'rgb(65,171,93)',
+            0.8, 'rgb(35,139,69)',
+            1, 'rgb(0,90,50)'
           ],
           // 1.7:
           // Baseline: zoom 11 = 15 px, zoom 15 = 20 px.
