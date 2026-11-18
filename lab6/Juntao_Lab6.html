@@ -34,6 +34,33 @@
     #county-chart .domain, #county-chart .tick line { stroke: #8595a5; }
     #map-panel { position: relative; min-width: 0; height: 100vh; color: #26313d; }
     #map { position: absolute; inset: 0; }
+    /* INDEPENDENT TASK: Indicator selector style */
+    #indicator-control {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 2;
+      padding: 12px;
+      background: white;
+      border-radius: 5px;
+      box-shadow: 0 2px 8px #0003;
+      color: #26313d;
+      font-size: 13px;
+    }
+
+    #indicator-control label {
+      margin-bottom: 5px;
+    }
+
+    #indicator-select {
+      width: 100%;
+      padding: 6px;
+      border: 1px solid #91a7ba;
+      border-radius: 4px;
+      background: white;
+      color: #26313d;
+      font-size: 13px;
+    }
     #legend { position: absolute; right: 12px; bottom: 40px; padding: 12px 14px;
       border-radius: 5px; background: #fffffff2; font-size: 12px; }
     #legend h2 { margin: 0 0 6px; font-size: 13px; }
@@ -65,10 +92,23 @@
     <div id="county-chart"></div>
     <p id="chart-note">The linked D3 graph will be connected in Step 4.</p>
     <p id="status" role="status">Loading map and WAcounties.geojson…</p>
-    <p class="muted">Map colors show total population in 2020, not population density. The data are historical; this dashboard is not a live monitoring feed.</p>
+    <p class="muted">
+      Map colors represent either total population in 2020 or population
+      growth from 2000 to 2020, depending on the selected indicator.
+      The line chart always shows annual population totals.
+      The data are historical, not a live monitoring feed.
+    </p>
   </aside>
   <main id="map-panel" aria-label="Washington county population map">
     <div id="map"></div>
+    <!-- INDEPENDENT TASK: Indicator selector -->
+    <div id="indicator-control">
+      <label for="indicator-select">Map indicator</label>
+      <select id="indicator-select">
+        <option value="population">Population (2020)</option>
+        <option value="growth">Population Growth (2000–2020)</option>
+      </select>
+    </div>
     <div id="legend"><h2>Population in 2020</h2></div>
   </main>
   <script>
@@ -139,16 +179,279 @@
         }
 
         // BEGIN STEP 2: HOVER + CLICK
-        // Paste the Step 2 JavaScript block here.
+        // Give the current input counties full emphasis; retain the rest as context.
+        highlightCounties = function(features) {
+          const ids = features.map(feature => feature.properties.OBJECTID);
+          const inFocus = ['in', ['get', 'OBJECTID'], ['literal', ids]];
+          map.setPaintProperty('county-fill', 'fill-opacity', ['case', inFocus, 0.85, 0.12]);
+          map.setPaintProperty('county-border', 'line-opacity', ['case', inFocus, 1, 0.16]);
+          map.setFilter('county-focus', features.length === counties.length
+            ? ['==', ['get', 'OBJECTID'], -1] : inFocus);
+        };
+
+        map.on('mousemove', 'county-fill', function(event) {
+          const id = event.features[0].properties.OBJECTID;
+          const feature = matchingCounties.find(county => county.properties.OBJECTID === id) || null;
+          map.getCanvas().style.cursor = feature ? 'pointer' : '';
+          if (selectedCounty || hoveredCounty === feature) return;
+          hoveredCounty = feature;
+          updateDashboard();
+        });
+
+        map.on('mouseleave', 'county-fill', function() {
+          map.getCanvas().style.cursor = '';
+          if (selectedCounty || !hoveredCounty) return;
+          hoveredCounty = null;
+          updateDashboard();
+        });
+
+        map.on('click', function(event) {
+          const hit = map.queryRenderedFeatures(event.point, {layers: ['county-fill']})[0];
+          selectedCounty = hit
+            ? matchingCounties.find(county => county.properties.OBJECTID === hit.properties.OBJECTID) || null
+            : null;
+          hoveredCounty = null;
+          document.getElementById('county-options').hidden = true;
+          document.getElementById('county-search').setAttribute('aria-expanded', 'false');
+          updateDashboard();
+        });
+
+        document.addEventListener('click', function(event) {
+          // Search controls are another way to select; their clicks must not clear a pin.
+          if (document.getElementById('county-filter').contains(event.target)) return;
+          document.getElementById('county-options').hidden = true;
+          document.getElementById('county-search').setAttribute('aria-expanded', 'false');
+          if (document.getElementById('map-panel').contains(event.target)) return;
+          selectedCounty = null;
+          hoveredCounty = null;
+          updateDashboard();
+        });
         // END STEP 2
 
+        // BEGIN INDIPENDENT TASK: HOVER POPUP
+        const countyPopup = new mapboxgl.Popup({
+          closeButton: false,
+          closeOnClick: false,
+          offset: 12
+        });
+        // Show county information when hovering over the map.
+        map.on('mousemove', 'county-fill', function(event) {
+          const id = event.features[0].properties.OBJECTID;
+          const county = matchingCounties.find(
+            feature => feature.properties.OBJECTID === id
+          );
+          // Do not show a popup for filtered-out counties.
+          if (!county) {
+            countyPopup.remove();
+            return;
+          }
+          const p = county.properties;
+          const pop2020 = Number(p.POP2020);
+
+          const growth = Number(p.POP2000) > 0
+            ? p.GROWTH.toFixed(1) + '%'
+            : 'N/A';
+          countyPopup
+            .setLngLat(event.lngLat)
+            .setHTML(
+              `<strong>${p.NAMELSAD10}</strong>
+              <p>Population (2020): ${pop2020.toLocaleString()}</p>
+              <p>Growth (2000–2020): ${growth}</p>`
+            )
+            .addTo(map);
+          // Keep the popup from blocking map mouse events.
+          countyPopup.getElement().style.pointerEvents = 'none';
+        });
+        // Remove popup when the mouse leaves the county layer.
+        map.on('mouseleave', 'county-fill', function() {
+          countyPopup.remove();
+        });
+        // Remove popup when clicking the map.
+        map.on('click', function() {
+          countyPopup.remove();
+        });
+        // END HOVER POPUP
+
         // BEGIN STEP 3: SEARCH FILTER
-        // Paste the Step 3 JavaScript block here.
+        const search = document.getElementById('county-search');
+        const options = document.getElementById('county-options');
+        const searchStatus = document.getElementById('search-status');
+        const sortedCounties = counties.slice().sort((a, b) =>
+          a.properties.NAMELSAD10.localeCompare(b.properties.NAMELSAD10));
+
+        function renderOptions() {
+          options.replaceChildren();
+          sortedCounties.filter(feature => matchingCounties.includes(feature)).forEach(function(feature) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = feature.properties.NAMELSAD10;
+            function preview() {
+              if (selectedCounty || hoveredCounty === feature) return;
+              hoveredCounty = feature;
+              updateDashboard();
+            }
+            function endPreview() {
+              if (selectedCounty || !hoveredCounty) return;
+              hoveredCounty = null;
+              updateDashboard();
+            }
+            button.addEventListener('mouseenter', preview);
+            button.addEventListener('focus', preview);
+            button.addEventListener('mouseleave', endPreview);
+            button.addEventListener('blur', endPreview);
+            button.addEventListener('click', function() {
+              selectedCounty = feature;
+              hoveredCounty = null;
+              options.hidden = true;
+              search.setAttribute('aria-expanded', 'false');
+              updateDashboard();
+            });
+            options.append(button);
+          });
+          searchStatus.textContent = matchingCounties.length
+            ? matchingCounties.length + ' of ' + counties.length + ' counties match. Clear the search to restore all.'
+            : 'No counties match. Try another name.';
+          if (!matchingCounties.length) options.textContent = 'No counties found';
+        }
+
+        function openOptions() {
+          renderOptions();
+          options.hidden = false;
+          search.setAttribute('aria-expanded', 'true');
+        }
+
+        search.disabled = false;
+        search.placeholder = 'Search counties, e.g. King';
+        search.addEventListener('focus', openOptions);
+        search.addEventListener('click', openOptions);
+        search.addEventListener('input', function() {
+          const query = search.value.trim().toLowerCase();
+          matchingCounties = counties.filter(feature =>
+            feature.properties.NAMELSAD10.toLowerCase().includes(query));
+          selectedCounty = null;
+          hoveredCounty = null;
+          openOptions();
+          updateDashboard();
+        });
+        search.addEventListener('keydown', function(event) {
+          if (event.key === 'Escape') {
+            options.hidden = true;
+            search.setAttribute('aria-expanded', 'false');
+            hoveredCounty = null;
+            updateDashboard();
+          }
+        });
+        renderOptions();
         // END STEP 3
 
         // BEGIN STEP 4: D3 LINKING
-        // Paste the Step 4 JavaScript block here.
+        // The chart is created once. Every interaction supplies a new feature array.
+        const years = d3.range(2000, 2021);
+        const margin = {top: 18, right: 20, bottom: 36, left: 62};
+        const width = 440 - margin.left - margin.right;
+        const height = 280 - margin.top - margin.bottom;
+        const svg = d3.select('#county-chart').append('svg')
+          .attr('viewBox', '0 0 440 280').attr('role', 'img');
+        const chartTitle = svg.append('title');
+        const chart = svg.append('g').attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+        const x = d3.scaleLinear().domain([2000, 2020]).range([0, width]);
+        const y = d3.scaleLinear().range([height, 0]);
+        chart.append('g').attr('transform', 'translate(0,' + height + ')')
+          .call(d3.axisBottom(x).tickValues([2000, 2005, 2010, 2015, 2020]).tickFormat(d3.format('d')));
+        const yAxis = chart.append('g');
+        const path = chart.append('path').attr('fill', 'none').attr('stroke', '#ffb547').attr('stroke-width', 3);
+        const dots = chart.append('g');
+        const line = d3.line().x(d => x(d.year)).y(d => y(d.population));
+
+        // This replaces the Starter's empty connection; no new map event is needed.
+        updateLinkedChart = function(features) {
+          const label = areaLabel(features);
+          document.getElementById('chart-note').textContent = features.length
+            ? label + ': annual population, 2000–2020. Multiple counties are summed; the y-axis starts at zero and rescales.'
+            : 'No matching counties. Clear or change the search to draw a graph.';
+          svg.style('display', features.length ? 'block' : 'none');
+          if (!features.length) return;
+
+          // map() transforms each year into one chart point; sum() uses only the input counties.
+          const series = years.map(function(year) {
+            return {
+              year: year,
+              population: d3.sum(features, feature => +feature.properties['POP' + year])
+            };
+          });
+          chartTitle.text(label + ' population, 2000–2020');
+          svg.attr('aria-label', label + ' population trend from 2000 to 2020');
+          y.domain([0, d3.max(series, d => d.population) * 1.08]).nice();
+          yAxis.call(d3.axisLeft(y).ticks(5).tickFormat(d3.format('~s')));
+          path.datum(series).attr('d', line);
+          dots.selectAll('circle').data(series, d => d.year).join('circle')
+            .attr('r', 3).attr('fill', '#ffb547')
+            .attr('cx', d => x(d.year)).attr('cy', d => y(d.population))
+            .selectAll('title').data(d => [d]).join('title')
+            .text(d => d.year + ': ' + d3.format(',')(d.population));
+        };
         // END STEP 4
+
+        // BEGIN INDEPENDENT TASK: POPULATION GROWTH INDICATOR
+        // Calculate population growth from 2000 to 2020.
+        counties.forEach(function(county) {
+          const p = county.properties;
+          p.GROWTH = p.POP2000 > 0
+            ? (p.POP2020 - p.POP2000) / p.POP2000 * 100
+            : 0;
+        });
+        // Add the growth values to the map source.
+        map.getSource('population').setData(data);
+        // Color ramp for population growth (%).
+        const growthColors = [
+          '#ffffcc',
+          '#c2e699',
+          '#78c679',
+          '#31a354',
+          '#006837'
+        ];
+        const growthFill = [
+          'step',
+          ['get', 'GROWTH'],
+          growthColors[0],
+          10, growthColors[1],
+          20, growthColors[2],
+          40, growthColors[3],
+          60, growthColors[4]
+        ];
+        // Switch between population and growth rate.
+        document.getElementById('indicator-select')
+          .addEventListener('change', function() {
+            const showGrowth = this.value === 'growth';
+            // Update map colors.
+            map.setPaintProperty(
+              'county-fill',
+              'fill-color',
+              showGrowth ? growthFill : fillColor
+            );
+            // Update legend title.
+            document.querySelector('#legend h2').textContent =
+              showGrowth
+                ? 'Population Growth (2000–2020)'
+                : 'Population in 2020';
+            // Update legend labels and colors.
+            const legendLabels = showGrowth
+              ? ['Under 10%', '10–19.9%', '20–39.9%',
+                 '40–59.9%', '60% or more']
+              : classes.map(group => group.label);
+            const legendColors = showGrowth
+              ? growthColors
+              : classes.map(group => group.color);
+            d3.select('#legend').selectAll('.legend-row')
+              .each(function(d, i) {
+                d3.select(this).select('.swatch')
+                  .style('background-color', legendColors[i]);
+
+                d3.select(this).select('span:last-child')
+                  .text(legendLabels[i]);
+              });
+          });
+        // END INDEPENDENT TASK
 
         updateDashboard();
         document.getElementById('status').textContent = counties.length + ' counties loaded.';
